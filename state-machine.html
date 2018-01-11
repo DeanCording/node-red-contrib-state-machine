@@ -1,0 +1,345 @@
+<!--
+
+node-red-contrib-state-machine - A Node Red node to implement a state machine using javascript-state-machine
+
+(https://www.npmjs.com/package/java-script-state-machine)
+
+MIT License
+
+Copyright (c) 2018 Dean Cording  <dean@cording.id.au>
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
+associated documentation files (the "Software"), to deal in the Software without restriction, including
+without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the
+following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial
+portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT
+LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN
+NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+-->
+
+<script type="text/javascript">
+(function() {
+    RED.nodes.registerType('state-machine',{
+        category: 'function',
+        color: '#ffb0a5',
+        defaults: {
+            name: {value:""},
+            triggerProperty: {value: "topic", required: true},
+            triggerPropertyType: {value: "msg", required: true},
+            stateProperty: {value: "topic", required: true},
+            statePropertyType: {value: "msg", required: true},
+            states: {value: ["start", "", "", ""], validate: function(states) {
+                    return (states.length > 0);
+                }
+            },
+            transitions: {value: [{name:"", from: "", to: ""},
+                                {name:"", from: "", to: ""},
+                                {name:"", from: "", to: ""}],
+                validate: function(transitions) {
+                    return (transitions.length > 0) && (transitions.every(function(transition) {
+                        if (transition.name.length == 0) return false;
+                        if ((transition.from !== "*") &&
+                            (!this.states.includes(transition.from))) return false;
+                        if (!this.states.includes(transition.to)) return false;
+                        return true;
+                    }, this));
+                }
+            }
+        },
+        inputs:1,
+        outputs:1,
+        icon: "switch.png",
+        label: function() {
+            return this.name||"state machine";
+        },
+        labelStyle: function() {
+            return this.name?"node_label_italic":"";
+        },
+        inputLabels: "trigger",
+        outputLabels: "state",
+        oneditprepare: function() {
+
+            if (!this.triggerPropertyType) {
+                this.triggerPropertyType = 'msg';
+            }
+            $("#node-input-triggerProperty").typedInput({
+                default: 'msg',
+                types: ['msg','flow','global'],
+                typeField: $("#node-input-triggerPropertyType")
+            });
+
+            if (!this.statePropertyType) {
+                this.statePropertyType = 'msg';
+            }
+            $("#node-input-stateProperty").typedInput({
+                default: 'msg',
+                types: ['msg','flow','global'],
+                typeField: $("#node-input-statePropertyType")
+            });
+
+
+            var statesList = $("#node-input-states-container");
+
+            statesList.editableList({
+                addItem: function(container, i, state) {
+                    if (typeof state != "string") state = "";
+
+                    var stateField = $('<input/>',{type: "text", style:"margin-left: 5px;", class: 'node-input-state-value'}).appendTo(container).focus();
+
+                    var label = $("<label>", {style:"margin-left: 5px;"}).text("Initial State")
+                        .hide().appendTo(container);
+
+                    if (i==0) label.show();
+
+                    stateField.change( function (event) {
+                        var prevVal = $(this).data("prev");
+                        var newVal = $(this).val().trim();
+
+                        if (newVal.length == 0) return;
+
+                        if ($(".node-input-trigger-from-value option[value='" + prevVal +"']").attr("value", newVal).text(newVal).length == 0) {
+                            $('.node-input-trigger-from-value').append($('<option>',{value: newVal, text: newVal}));
+                        }
+
+                        if ($(".node-input-trigger-to-value option[value='" + prevVal +"']")
+                                .attr("value", newVal).text(newVal).length == 0) {
+                            $('.node-input-trigger-to-value').append($('<option>',{value: newVal, text: newVal}));
+                        }
+
+                        $(this).data("prev", newVal);
+
+                    });
+
+                    stateField.val(state);
+                    stateField.data("prev", state);
+                },
+                removeItem: function(state) {
+
+                    var select = $(".node-input-trigger-from-value")
+                        .filter( function(index, element) { return (element.value == state); });
+                    $(".node-input-trigger-from-value option[value='" + state +"']").remove();
+
+                    select.each(function(i,from) {
+                        from.value = null;
+                    });
+
+                    select = $(".node-input-trigger-to-value")
+                        .filter( function(index, element) { return (element.value == state); });
+                    $(".node-input-trigger-to-value option[value='" + state +"']").remove();
+
+                    select.each(function(i,to) {
+                        to.value = null;
+                    });
+
+                    $("#node-input-states-container").find("label").first().show();
+
+                },
+                sortItems: function(opt) {
+
+                    var states = $("#node-input-states-container").editableList('items');
+
+                    states.each(function(i) {
+                        var state = $(this).find(".node-input-state-value").val();
+
+                        $(".node-input-trigger-from-value").each( function () {
+                            $(this).find("option[value='" + state +"']")
+                            .insertBefore($(this).find("option:eq("+(i+1)+")"));
+                        });
+
+                        $(".node-input-trigger-to-value").each( function () {
+                            $(this).find("option[value='" + state +"']")
+                            .insertBefore($(this).find("option:eq("+i+")"));
+                        });
+
+                        if (i==0) $(this).find("label").show(); else $(this).find("label").hide();
+                    });
+                },
+                sortable: true,
+                removable: true,
+                scrollOnAdd: true,
+                height: "auto",
+                addButton: "add state"
+            });
+
+            var transitionsList = $("#node-input-transitions-container");
+
+            transitionsList.editableList({
+                addItem: function(container, i, transition) {
+
+                    if (!transition.hasOwnProperty('name')) {
+                        transition = {name:"", from: "", to: ""};
+                    }
+
+                    var row = $('<div/>',{class: "form-row", style: "display: flex; margin-bottom: 0;"}).appendTo(container);
+
+                    var triggerField = $('<input/>',{type: "text", style:"margin-left: 5px; margin-bottom: 0;", class: 'node-input-trigger-value'}).appendTo(row).focus();
+
+                    triggerField.val(transition.name);
+
+                    var row2 = $('<div/>',{class: "form-row", style: "display:inherit; margin-bottom: 0;"})
+                        .appendTo(row);
+
+                    var fromField = $('<select/>',{style:"margin-left: 5px; margin-bottom: 0; width: auto;", class: 'node-input-trigger-from-value'}).appendTo(row2);
+
+                    row2.append("<span> &#8594; </span>");
+
+                    var toField = $('<select/>',{style:"margin-left: 5px; margin-bottom: 0; width: auto;", class: 'node-input-trigger-to-value'}).appendTo(row2);
+
+                    fromField.append($('<option>',{value: '*', text: '*'}));
+
+                    var states = $("#node-input-states-container").editableList('items');
+                    states.each(function(i) {
+                        var state = $(this).find(".node-input-state-value").val();
+                        fromField.append($('<option>',{value: state, text: state}));
+                        toField.append($('<option>',{value: state, text: state}));
+                    });
+
+                    fromField.val(transition.from);
+                    toField.val(transition.to);
+
+                },
+                sortable: true,
+                removable: true,
+                height: "auto",
+                scrollOnAdd: true,
+                header: $("<div>").append($.parseHTML("<div style='width:65%; display: inline-grid; margin-left: 30px;'>Trigger</div><div style='display: inline-grid'>From &#8594; To</div>")),
+
+                addButton: "add transition"
+            });
+
+
+            statesList.editableList('addItems',this.states);
+            transitionsList.editableList('addItems', this.transitions);
+
+
+        },
+        oneditsave: function() {
+
+            var node = this;
+
+            if ($("#node-input-statePropertyType").val() == "msg") {
+                node.outputs = 1;
+            } else {
+                node.outputs = 0;
+            }
+
+            node.states = [];
+
+            $("#node-input-states-container").editableList('items').each(function(i){
+                var state = $(this).find(".node-input-state-value").val().trim();
+                if (state.length > 0) {
+                    node.states.push(state);
+                }
+            });
+
+            node.transitions = [];
+
+             $("#node-input-transitions-container").editableList('items').each(function(i){
+                var trigger = $(this).find(".node-input-trigger-value").val().trim();
+                if (trigger.length > 0) {
+                    node.transitions.push({name: trigger,
+                                      from: $(this).find(".node-input-trigger-from-value").val(),
+                                      to: $(this).find(".node-input-trigger-to-value").val()
+                                    });
+                }
+            });
+        }
+    });
+})();
+</script>
+
+
+<script type="text/x-red" data-template-name="state-machine">
+    <div class="form-row">
+        <label for="node-input-name"><i class="icon-tag"></i> Name</label>
+        <input type="text" id="node-input-name" placeholder="Name">
+    </div>
+    <div class="form-row">
+        <label for="node-input-triggerProperty"><i class="fa fa-edit"></i> Trigger Input</label>
+        <input type="text" id="node-input-triggerProperty" placeholder="Trigger" style="width:250px;">
+        <input type="hidden" id="node-input-triggerPropertyType">
+    </div>
+    <div class="form-row">
+        <label for="node-input-stateProperty"><i class="fa fa-edit"></i> State Output</label>
+        <input type="text" id="node-input-stateProperty" placeholder="State" style="width:250px;">
+        <input type="hidden" id="node-input-statePropertyType">
+    </div>
+     <div class="form-row node-input-states-container-row">
+        <label><i class="fa fa-list"></i> States</span></label>
+        <ol id="node-input-states-container"></ol>
+    </div>
+     <div class="form-row node-input-transitions-container-row">
+        <label><i class="fa fa-list"></i> Transitions</span></label>
+        <ol id="node-input-transitions-container"></ol>
+    </div>
+</script>
+
+<script type="text/x-red" data-help-name="state-machine">
+    <p>A node that implements a finite state machine using messages to trigger state transitions.</p>
+
+    <h3>Properties</h3>
+        <dl class="message-properties">
+            <dt>name<span class="property-type">string</span></dt>
+            <dd>the name of the node as displayed in the editor</dd>
+            <dt>trigger input<span class="property-type">property </span></dt>
+            <dd>the property to use as the trigger source </dd>
+            <dt>state output<span class="property-type">property </span></dt>
+            <dd>the property to set to the current state</dd>
+            <dt>states<span class="property-type"> string </span></dt>
+            <dd>a list of the valid states for the finite state machine </dd>
+            <dt>transition trigger<span class="property-type"> string </span></dt>
+            <dd>the string to trigger the transition</dd>
+            <dt>transition from <span class="property-type">state </span></dt>
+            <dd>the state the transition will move from </dd>
+            <dt>transition to <span class="property-type">state </span></dt>
+            <dd>the state the transition will move to </dd>
+        </dl>
+
+    <h3>Inputs</h3>
+        <dl class="message-properties">
+            <dt>trigger
+                <span class="property-type">string</span>
+            </dt>
+            <dd> if the <code>trigger input</code> property is set to a <code>msg</code> property.</dd>
+        </dl>
+
+    <h3>Outputs</h3>
+        <dl class="message-properties">
+           <dd>If the <code>state output</code> is set to a <code>msg</code> property, that property will
+           be set in the original message to the current state and the message passed through with all
+           other message properties passed through unchanged.</dd>
+
+           <dd>If the <code>state output</code> is set to a <code>flow</code> or <code>global</code>
+           context property then no message is output.</dd>
+       </dl>
+
+    <h3>Details</h3>
+
+        <p>The state machine will always start in the first state of the list of states.</p>
+
+        <p>The node will check the <code>trigger input</code> property on the receipt of any message.
+        This allows it to use global and flow context properties as triggers but state transitions will
+        only occur on message receipt.</p>
+
+        <p>If the value of the <code>trigger input</code> property matches one of the
+        <code>transition trigger</code> for a transition in the current state, that transition will be
+        actioned and the state changed to the new state.  <code>trigger input</code> values that do not match
+        a <code>transition trigger</code> for the current state do not trigger any state change.</p>
+
+        <p>At start up, the node will emit a message with the initial state if the <code>state output</code>
+         property is set to a <code>msg</code> property.</p>
+
+        <p>Transitions with a <code>transition from</code> state of <code>*</code> are actioned for all states.</p>
+
+    <h3>References</h3>
+        <ul>
+            <li><a href="https://www.npmjs.com/package/javascript-state-machine">Javascript State Machine</a> - full documentation of Javascript State Machine library.</li>
+        </ul>
+</script>

@@ -1,0 +1,104 @@
+/*****
+
+node-red-contrib-state-machine - A Node Red node to implement a state machine using javascript-state-machine
+
+(https://www.npmjs.com/package/java-script-state-machine)
+
+MIT License
+
+Copyright (c) 2018 Dean Cording  <dean@cording.id.au>
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
+documentation files (the "Software"), to deal in the Software without restriction, including without
+limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
+the Software, and to permit persons to whom the Software is furnished to do so, subject to the following
+conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial
+portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT
+LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN
+NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+*/
+
+// Core dependency
+const StateMachine = require('javascript-state-machine');
+const util = require('util');
+
+module.exports = function(RED) {
+    function StateMachineNode(config) {
+        RED.nodes.createNode(this,config);
+        var node = this;
+
+        node.triggerProperty = config.triggerProperty || 'topic';
+        node.triggerPropertyType = config.triggerPropertyType || 'msg';
+        node.stateProperty = config.stateProperty || 'topic';
+        node.statePropertyType = config.statePropertyType || 'msg';
+
+        var states = config.states || [];
+        var transitions = config.transitions || [];
+
+        try {
+            node.fsm = new StateMachine({
+                init: states[0],
+                transitions: transitions
+            });
+        } catch (e) {
+            node.status({fill:"red",shape:"dot",text: e.message});
+            throw(e);
+        }
+
+
+        node.status({fill:"green",shape:"dot",text: states[0]});
+
+        if (node.statePropertyType === 'flow') {
+            node.context().flow.set(node.stateProperty,states[0]);
+        } else if (node.statePropertyType === 'global') {
+            node.context().global.set(node.stateProperty,states[0]);
+        }
+
+        node.startup = function(){
+            if (node.statePropertyType === 'msg') {
+
+                msg = {};
+                RED.util.setMessageProperty(msg,node.stateProperty,node.fsm.state);
+
+                node.send(msg);
+            }
+        }
+
+        RED.events.on("nodes-started", node.startup);
+
+        node.on('close', function() {
+            RED.events.removeListener("nodes-started", node.startup);
+        });
+
+        node.on('input', function(msg) {
+
+            var trigger = RED.util.evaluateNodeProperty(node.triggerProperty,
+                                                            node.triggerPropertyType,node,msg);
+
+            if (node.fsm.can(trigger)) {
+                node.fsm[trigger]();
+            }
+
+            if (node.statePropertyType === 'msg') {
+                RED.util.setMessageProperty(msg,node.stateProperty,node.fsm.state);
+            } else if (node.statePropertyType === 'flow') {
+                node.context().flow.set(node.stateProperty,node.fsm.state);
+            } else if (node.statePropertyType === 'global') {
+                node.context().global.set(node.stateProperty,node.fsm.state);
+            }
+
+            node.status({fill:"green",shape:"dot",text: node.fsm.state});
+
+            node.send(msg);
+
+        });
+    }
+    RED.nodes.registerType("state-machine",StateMachineNode);
+};
+
