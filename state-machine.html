@@ -35,6 +35,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
             triggerPropertyType: {value: "msg", required: true},
             stateProperty: {value: "topic", required: true},
             statePropertyType: {value: "msg", required: true},
+            outputStateChangeOnly: {value: false},
             states: {value: ["start", "", "", ""], validate: function(states) {
                     return (states.length > 0);
                 }
@@ -270,6 +271,11 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
         <label for="node-input-stateProperty"><i class="fa fa-edit"></i> State Output</label>
         <input type="text" id="node-input-stateProperty" placeholder="State" style="width:250px;">
         <input type="hidden" id="node-input-statePropertyType">
+    </div>
+    <div class="form-row">
+        <label>&nbsp;</label>
+        <input type="checkbox" id="node-input-outputStateChangeOnly" style="display: inline-block; width: auto; vertical-align: top;">
+        <label for="node-input-outputStateChangeOnly" style="width: 70%;">Output only on state change</label>
     </div>
      <div class="form-row node-input-states-container-row">
         <label><i class="fa fa-list"></i> States</span></label>

@@ -26,9 +26,30 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 // Core dependency
 const StateMachine = require('javascript-state-machine');
+
 const util = require('util');
 
+function camelize(label) {
+
+  if (label.length === 0)
+    return label;
+
+  var n, result, word, words = label.split(/[_-]/);
+
+  // single word with first character already lowercase, return untouched
+  if ((words.length === 1) && (words[0][0].toLowerCase() === words[0][0]))
+    return label;
+
+  result = words[0].toLowerCase();
+  for(n = 1 ; n < words.length ; n++) {
+    result = result + words[n].charAt(0).toUpperCase() + words[n].substring(1).toLowerCase();
+  }
+
+  return result;
+}
+
 module.exports = function(RED) {
+
     function StateMachineNode(config) {
         RED.nodes.createNode(this,config);
         var node = this;
@@ -37,6 +58,9 @@ module.exports = function(RED) {
         node.triggerPropertyType = config.triggerPropertyType || 'msg';
         node.stateProperty = config.stateProperty || 'topic';
         node.statePropertyType = config.statePropertyType || 'msg';
+        node.outputStateChangeOnly = config.outputStateChangeOnly;
+
+        if (node.outputStateChangeOnly == undefined) node.outputStateChangeOnly = false;
 
         var states = config.states || [];
         var transitions = config.transitions || [];
@@ -50,7 +74,6 @@ module.exports = function(RED) {
             node.status({fill:"red",shape:"dot",text: e.message});
             throw(e);
         }
-
 
         node.status({fill:"green",shape:"dot",text: states[0]});
 
@@ -81,21 +104,29 @@ module.exports = function(RED) {
             var trigger = RED.util.evaluateNodeProperty(node.triggerProperty,
                                                             node.triggerPropertyType,node,msg);
 
+            var transition = false;
+
             if (node.fsm.can(trigger)) {
+                trigger = camelize(trigger);
                 node.fsm[trigger]();
+                transition = true;
+
+                if (node.statePropertyType === 'msg') {
+                    RED.util.setMessageProperty(msg,node.stateProperty,node.fsm.state);
+                } else if (node.statePropertyType === 'flow') {
+                    node.context().flow.set(node.stateProperty,node.fsm.state);
+                } else if (node.statePropertyType === 'global') {
+                    node.context().global.set(node.stateProperty,node.fsm.state);
+                }
+
+                node.status({fill:"green",shape:"dot",text: node.fsm.state});
+
+                node.send(msg);
+            } else if (!node.outputStateChangeOnly) {
+                if (node.statePropertyType === 'msg')
+                    RED.util.setMessageProperty(msg,node.stateProperty,node.fsm.state);
+                node.send(msg);
             }
-
-            if (node.statePropertyType === 'msg') {
-                RED.util.setMessageProperty(msg,node.stateProperty,node.fsm.state);
-            } else if (node.statePropertyType === 'flow') {
-                node.context().flow.set(node.stateProperty,node.fsm.state);
-            } else if (node.statePropertyType === 'global') {
-                node.context().global.set(node.stateProperty,node.fsm.state);
-            }
-
-            node.status({fill:"green",shape:"dot",text: node.fsm.state});
-
-            node.send(msg);
 
         });
     }
