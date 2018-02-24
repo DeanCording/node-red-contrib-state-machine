@@ -59,8 +59,10 @@ module.exports = function(RED) {
         node.stateProperty = config.stateProperty || 'topic';
         node.statePropertyType = config.statePropertyType || 'msg';
         node.outputStateChangeOnly = config.outputStateChangeOnly;
+        node.throwException = config.throwException;
 
         if (node.outputStateChangeOnly == undefined) node.outputStateChangeOnly = false;
+        if (node.throwException == undefined) node.throwException = false;
 
         var states = config.states || [];
         var transitions = config.transitions || [];
@@ -111,6 +113,12 @@ module.exports = function(RED) {
                 node.fsm[trigger]();
                 transition = true;
 
+            } else if (node.throwException) {
+                node.error("Invalid transition", msg);
+                return null;
+            }
+
+            if (transition || !node.outputStateChangeOnly) {
                 if (node.statePropertyType === 'msg') {
                     RED.util.setMessageProperty(msg,node.stateProperty,node.fsm.state);
                 } else if (node.statePropertyType === 'flow') {
@@ -118,14 +126,9 @@ module.exports = function(RED) {
                 } else if (node.statePropertyType === 'global') {
                     node.context().global.set(node.stateProperty,node.fsm.state);
                 }
+                node.send(msg);
 
                 node.status({fill:"green",shape:"dot",text: node.fsm.state});
-
-                node.send(msg);
-            } else if (!node.outputStateChangeOnly) {
-                if (node.statePropertyType === 'msg')
-                    RED.util.setMessageProperty(msg,node.stateProperty,node.fsm.state);
-                node.send(msg);
             }
 
         });

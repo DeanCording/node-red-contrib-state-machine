@@ -36,6 +36,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
             stateProperty: {value: "topic", required: true},
             statePropertyType: {value: "msg", required: true},
             outputStateChangeOnly: {value: false},
+            throwException: {value: false},
             states: {value: ["start", "", "", ""], validate: function(states) {
                     return (states.length > 0);
                 }
@@ -103,7 +104,11 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
                         var prevVal = $(this).data("prev");
                         var newVal = $(this).val().trim();
 
-                        if (newVal.length == 0) return;
+                        if (newVal.length == 0) {
+                            $(".node-input-trigger-from-value option[value='" + prevVal +"']").remove();
+                            $(".node-input-trigger-to-value option[value='" + prevVal +"']").remove();
+                            return;
+                        }
 
                         if ($(".node-input-trigger-from-value option[value='" + prevVal +"']").attr("value", newVal).text(newVal).length == 0) {
                             $('.node-input-trigger-from-value').append($('<option>',{value: newVal, text: newVal}));
@@ -198,8 +203,10 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
                     var states = $("#node-input-states-container").editableList('items');
                     states.each(function(i) {
                         var state = $(this).find(".node-input-state-value").val();
-                        fromField.append($('<option>',{value: state, text: state}));
-                        toField.append($('<option>',{value: state, text: state}));
+                        if (state != "") {
+                            fromField.append($('<option>',{value: state, text: state}));
+                            toField.append($('<option>',{value: state, text: state}));
+                        }
                     });
 
                     fromField.val(transition.from);
@@ -277,6 +284,11 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
         <input type="checkbox" id="node-input-outputStateChangeOnly" style="display: inline-block; width: auto; vertical-align: top;">
         <label for="node-input-outputStateChangeOnly" style="width: 70%;">Output only on state change</label>
     </div>
+    <div class="form-row">
+        <label>&nbsp;</label>
+        <input type="checkbox" id="node-input-throwException" style="display: inline-block; width: auto; vertical-align: top;">
+        <label for="node-input-throwException" style="width: 70%;">Throw error on invalid transition</label>
+    </div>
      <div class="form-row node-input-states-container-row">
         <label><i class="fa fa-list"></i> States</span></label>
         <ol id="node-input-states-container"></ol>
@@ -337,7 +349,10 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
         <p>If the value of the <code>trigger input</code> property matches one of the
         <code>transition trigger</code> for a transition in the current state, that transition will be
         actioned and the state changed to the new state.  <code>trigger input</code> values that do not match
-        a <code>transition trigger</code> for the current state do not trigger any state change.</p>
+        a <code>transition trigger</code> for the current state do not trigger any state change. If the
+        <code>Throw error on invalid transition</code> is checked, the node will throw an error and stop
+        the flow if the <code>trigger input</code> does not match a valid transition trigger for the current
+        state.</p>
 
         <p>At start up, the node will emit a message with the initial state if the <code>state output</code>
          property is set to a <code>msg</code> property.</p>
