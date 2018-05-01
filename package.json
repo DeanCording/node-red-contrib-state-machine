@@ -1,12 +1,12 @@
 {
-  "name": "node-red-contrib-state-machine",
-  "version": "1.2.0",
+  "name": "node-red-contrib-state-machine-2",
+  "version": "1.2.1",
   "description": "A Node Red node for implementing a finite state machine.",
   "dependencies": {
     "javascript-state-machine": "3.*"
   },
   "author": {
-    "name": "Dean Cording",
+    "name": "Blind Squirrel",
     "email": "dean@cording.id.au"
   },
   "license": "MIT",
@@ -18,17 +18,9 @@
     "state",
     "transition"
   ],
-  "bugs": {
-    "url": "https://github.com/DeanCording/node-red-contrib-state-machine/issues"
-  },
-  "homepage": "https://github.com/DeanCording/node-red-contrib-state-machine",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/DeanCording/node-red-contrib-state-machine.git"
-  },
   "node-red": {
     "nodes": {
-      "state-machine": "state-machine.js"
+      "state-machine-2": "state-machine.js"
     }
   },
   "devDependencies": {
