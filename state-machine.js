@@ -58,11 +58,13 @@ module.exports = function(RED) {
         node.triggerPropertyType = config.triggerPropertyType || 'msg';
         node.stateProperty = config.stateProperty || 'topic';
         node.statePropertyType = config.statePropertyType || 'msg';
+        node.discreteOutputs = config.discreteOutputs;
         node.outputStateChangeOnly = config.outputStateChangeOnly;
         node.throwException = config.throwException;
 
         if (node.outputStateChangeOnly == undefined) node.outputStateChangeOnly = false;
         if (node.throwException == undefined) node.throwException = false;
+        if (node.discreteOutputs == undefined) node.discreteOutputs = false;
 
         var states = config.states || [];
         var transitions = config.transitions || [];
@@ -121,12 +123,20 @@ module.exports = function(RED) {
             if (transition || !node.outputStateChangeOnly) {
                 if (node.statePropertyType === 'msg') {
                     RED.util.setMessageProperty(msg,node.stateProperty,node.fsm.state);
+
+                    // Default behavior, send all states out a single output.
+                    if(!node.discreteOutputs) node.send(msg);
+                    // Otherwise, use a separate output for each state.
+                    else {
+                        var onward = [];
+                        onward[states.indexOf(node.fsm.state)] = msg;
+                        node.send(onward);
+                    }
                 } else if (node.statePropertyType === 'flow') {
                     node.context().flow.set(node.stateProperty,node.fsm.state);
                 } else if (node.statePropertyType === 'global') {
                     node.context().global.set(node.stateProperty,node.fsm.state);
                 }
-                node.send(msg);
 
                 node.status({fill:"green",shape:"dot",text: node.fsm.state});
             }

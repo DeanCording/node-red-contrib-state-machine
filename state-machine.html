@@ -37,13 +37,14 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
             statePropertyType: {value: "msg", required: true},
             outputStateChangeOnly: {value: false},
             throwException: {value: false},
+            discreteOutputs: {value: false},
             states: {value: ["start", "", "", ""], validate: function(states) {
                     return (states.length > 0);
                 }
             },
-            transitions: {value: [{name:"", from: "", to: ""},
-                                {name:"", from: "", to: ""},
-                                {name:"", from: "", to: ""}],
+            transitions: {value: [{name:"", from: "", to: "", out: false},
+                                {name:"", from: "", to: "", out: false},
+                                {name:"", from: "", to: "", out: false}],
                 validate: function(transitions) {
                     return (transitions.length > 0) && (transitions.every(function(transition) {
                         if (transition.name.length == 0) return false;
@@ -53,10 +54,11 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
                         return true;
                     }, this));
                 }
-            }
+            },
+            outputs: {value: 1}
         },
-        inputs:1,
-        outputs:1,
+        inputs: 1,
+        outputs: 1,
         icon: "switch.png",
         label: function() {
             return this.name||"state machine";
@@ -65,8 +67,13 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
             return this.name?"node_label_italic":"";
         },
         inputLabels: "trigger",
-        outputLabels: "state",
+        outputLabels: function(index) {
+            if(!this.discreteOutputs) return "state";
+
+            return this.states[index];
+        },
         oneditprepare: function() {
+            var node = this;
 
             if (!this.triggerPropertyType) {
                 this.triggerPropertyType = 'msg';
@@ -86,6 +93,21 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
                 typeField: $("#node-input-statePropertyType")
             });
 
+            var outputStateChangeOnly = $("#node-input-outputStateChangeOnly");
+            var discrete = $("#node-input-discreteOutputs");
+            discrete.change(function(){
+                var discreteChosen = discrete.is(':checked');
+                if(discreteChosen) {
+                    outputStateChangeOnly.attr("data-user-choice", outputStateChangeOnly.is(':checked'));
+                    outputStateChangeOnly.prop('checked', true).attr("disabled", true);
+                }
+                else {
+                    outputStateChangeOnly.prop('checked', outputStateChangeOnly.attr("data-user-choice"));
+                    outputStateChangeOnly.removeAttr("disabled").removeAttr("data-user-choice");   
+                }
+            });
+
+            var outputCount = $("#node-input-outputDetails").val("{}");
 
             var statesList = $("#node-input-states-container");
 
@@ -120,13 +142,20 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
                         }
 
                         $(this).data("prev", newVal);
-
+ 
                     });
 
                     stateField.val(state);
                     stateField.data("prev", state);
+
+                    var currentOutputs = JSON.parse(outputCount.val()||"{}");
+                    currentOutputs[state] = i;
+                    outputCount.val(JSON.stringify(currentOutputs));
                 },
                 removeItem: function(state) {
+
+                    var currentOutputs = JSON.parse(outputCount.val()||"{}");
+                    delete currentOutputs[state];
 
                     var select = $(".node-input-trigger-from-value")
                         .filter( function(index, element) { return (element.value == state); });
@@ -146,8 +175,10 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
                     $("#node-input-states-container").find("label").first().show();
 
+                    outputCount.val(JSON.stringify(currentOutputs));
                 },
                 sortItems: function(opt) {
+                    var currentOutputs = JSON.parse(outputCount.val()||"{}");
 
                     var states = $("#node-input-states-container").editableList('items');
 
@@ -166,6 +197,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
                         if (i==0) $(this).find("label").show(); else $(this).find("label").hide();
                     });
+                    outputCount.val(JSON.stringify(currentOutputs));
                 },
                 sortable: true,
                 removable: true,
@@ -232,12 +264,6 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
             var node = this;
 
-            if ($("#node-input-statePropertyType").val() == "msg") {
-                node.outputs = 1;
-            } else {
-                node.outputs = 0;
-            }
-
             node.states = [];
 
             $("#node-input-states-container").editableList('items').each(function(i){
@@ -258,6 +284,16 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
                                     });
                 }
             });
+
+            var outputs = 0;
+
+            if ($("#node-input-statePropertyType").val() == "msg") {
+                outputs = !$("#node-input-discreteOutputs").is(':checked') ? 1 : Object.keys(JSON.parse($("#node-input-outputDetails").val())).length;
+            } 
+
+            $("#node-input-outputs").val(outputs);
+            node.outputs = outputs; 
+
         }
     });
 })();
@@ -278,6 +314,12 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
         <label for="node-input-stateProperty"><i class="fa fa-edit"></i> State Output</label>
         <input type="text" id="node-input-stateProperty" placeholder="State" style="width:250px;">
         <input type="hidden" id="node-input-statePropertyType">
+    </div>
+    <div class="form-row">
+        <label>&nbsp;</label>
+        <input type="checkbox" id="node-input-discreteOutputs" style="display: inline-block; width: auto; vertical-align: top;">
+        <label for="node-input-discreteOutputs" style="width: 70%;">Discrete output per state</label>
+        <input type="hidden" id="node-input-outputDetails">
     </div>
     <div class="form-row">
         <label>&nbsp;</label>
