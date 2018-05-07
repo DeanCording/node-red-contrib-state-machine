@@ -3,7 +3,8 @@
   "version": "1.2.1",
   "description": "A Node Red node for implementing a finite state machine.",
   "dependencies": {
-    "javascript-state-machine": "3.*"
+    "javascript-state-machine": "3.*",
+    "node-red": "^0.18.4"
   },
   "author": {
     "name": "Blind Squirrel",

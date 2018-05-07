@@ -93,6 +93,20 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
                 typeField: $("#node-input-statePropertyType")
             });
 
+            var outputStateChangeOnly = $("#node-input-outputStateChangeOnly");
+            var discrete = $("#node-input-discreteOutputs");
+            discrete.change(function(){
+                var discreteChosen = discrete.is(':checked');
+                if(discreteChosen) {
+                    outputStateChangeOnly.attr("data-user-choice", outputStateChangeOnly.is(':checked'));
+                    outputStateChangeOnly.prop('checked', true).attr("disabled", true);
+                }
+                else {
+                    outputStateChangeOnly.prop('checked', outputStateChangeOnly.attr("data-user-choice"));
+                    outputStateChangeOnly.removeAttr("disabled").removeAttr("data-user-choice");   
+                }
+            });
+
             var outputCount = $("#node-input-outputDetails").val("{}");
 
             var statesList = $("#node-input-states-container");
@@ -100,11 +114,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
             statesList.editableList({
                 addItem: function(container, i, state) {
                     if (typeof state != "string") state = "";
-/*
-                    if (!state.hasOwnProperty('i')) {
-                        state._i = Math.floor((0x99999-0x10000)*Math.random()).toString();
-                    }
-*/
+
                     var stateField = $('<input/>',{type: "text", style:"margin-left: 5px;", class: 'node-input-state-value'}).appendTo(container).focus();
 
                     var label = $("<label>", {style:"margin-left: 5px;"}).text("Initial State")
@@ -278,7 +288,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
             var outputs = 0;
 
             if ($("#node-input-statePropertyType").val() == "msg") {
-                outputs = !$("#node-input-discreteOutputs")[0].checked ? 1 : Object.keys(JSON.parse($("#node-input-outputDetails").val())).length;
+                outputs = !$("#node-input-discreteOutputs").is(':checked') ? 1 : Object.keys(JSON.parse($("#node-input-outputDetails").val())).length;
             } 
 
             $("#node-input-outputs").val(outputs);
