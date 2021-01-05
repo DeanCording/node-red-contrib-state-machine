@@ -95,10 +95,10 @@ module.exports = function(RED) {
             }
         }
 
-        RED.events.on("nodes-started", node.startup);
+        RED.events.on("flows:started", node.startup);
 
         node.on('close', function() {
-            RED.events.removeListener("nodes-started", node.startup);
+            RED.events.removeListener("flows:started", node.startup);
         });
 
         node.on('input', function(msg) {
